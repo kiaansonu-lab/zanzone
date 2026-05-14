@@ -10,8 +10,10 @@ exports.getTickets = async (req, res) => {
         const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm);
         const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
         
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
+        
         let cf;
-        if (isSuperAdmin || (roleNorm === 'admin' && isHQ)) {
+        if (isSuperAdmin || isHQManagement) {
             cf = { clause: '', params: [] };
         } else {
             cf = companyFilter(req, 'st');
@@ -77,8 +79,10 @@ exports.getEvents = async (req, res) => {
         const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm);
         const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
         
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
+        
         let cf;
-        if (isSuperAdmin || (roleNorm === 'admin' && isHQ)) {
+        if (isSuperAdmin || isHQManagement) {
             cf = { clause: '', params: [] };
         } else {
             cf = companyFilter(req, 'e');
@@ -175,16 +179,17 @@ exports.updateEvent = async (req, res) => {
 exports.deleteEvent = async (req, res) => {
     try {
         const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
-        const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm);
         const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
-        
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
+
         let cs;
-        if (isSuperAdmin || (roleNorm === 'admin' && isHQ)) {
+        if (roleNorm === 'super_admin' || isHQManagement) {
             cs = { clause: '', params: [] };
         } else {
             cs = companyScope(req);
         }
-        await db.query(`DELETE FROM events WHERE id = ?${cs.clause}`, [req.params.id, ...cs.params]);
+
+        const [result] = await db.query(`DELETE FROM events WHERE id = ?${cs.clause}`, [req.params.id, ...cs.params]);
         return successResponse(res, null, 'Event deleted.');
     } catch (err) { return errorResponse(res, 'Failed to delete event.', 500); }
 };
@@ -196,8 +201,10 @@ exports.getGuestRequests = async (req, res) => {
         const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm);
         const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
         
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
+        
         let cf;
-        if (isSuperAdmin || (roleNorm === 'admin' && isHQ)) {
+        if (isSuperAdmin || isHQManagement) {
             cf = { clause: '', params: [] };
         } else {
             cf = companyFilter(req, 'gr');
@@ -296,8 +303,10 @@ exports.getChauffeurRequests = async (req, res) => {
         const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm);
         const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
         
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
+        
         let cf;
-        if (isSuperAdmin || (roleNorm === 'admin' && isHQ)) {
+        if (isSuperAdmin || isHQManagement) {
             cf = { clause: '', params: [] };
         } else {
             cf = companyFilter(req, 'd');
@@ -317,8 +326,10 @@ exports.getAudits = async (req, res) => {
         const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm);
         const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
         
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
+        
         let cf;
-        if (isSuperAdmin || (roleNorm === 'admin' && isHQ)) {
+        if (isSuperAdmin || isHQManagement) {
             cf = { clause: '', params: [] };
         } else {
             cf = companyFilter(req, 'al');
@@ -348,11 +359,11 @@ exports.updateAudit = async (req, res) => {
     try {
         const { title, type, description, status } = req.body;
         const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
-        const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm);
         const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
-        
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
+
         let cs;
-        if (isSuperAdmin || (roleNorm === 'admin' && isHQ)) {
+        if (roleNorm === 'super_admin' || isHQManagement) {
             cs = { clause: '', params: [] };
         } else {
             cs = companyScope(req);

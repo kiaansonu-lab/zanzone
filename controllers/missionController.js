@@ -23,11 +23,11 @@ async function resolveValidCompanyId(...candidates) {
 
 exports.getAll = async (req, res) => {
     try {
-        const role = req.user.role;
-        const isHQ = (req.user.company_id == 1 || !req.user.company_id || req.companyScope == 1);
+        const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
         
         let cf;
-        if (role === 'super_admin' || (role === 'admin' && isHQ)) {
+        if (roleNorm === 'super_admin' || isHQManagement) {
             cf = { clause: '', params: [] };
         } else {
             cf = companyFilter(req, 'm');
@@ -135,11 +135,11 @@ exports.convertFromProject = async (req, res) => {
 exports.updateStatus = async (req, res) => {
     try {
         const { status } = req.body;
-        const role = req.user.role;
-        const isHQ = (req.user.company_id == 1 || !req.user.company_id || req.companyScope == 1);
+        const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
         
         let cs;
-        if (role === 'super_admin' || (role === 'admin' && isHQ)) {
+        if (roleNorm === 'super_admin' || isHQManagement) {
             cs = { clause: '', params: [] };
         } else {
             cs = companyScope(req);
@@ -152,11 +152,11 @@ exports.updateStatus = async (req, res) => {
 exports.assignDriver = async (req, res) => {
     try {
         const { driverId, vehicleId } = req.body;
-        const role = req.user.role;
-        const isHQ = (req.user.company_id == 1 || !req.user.company_id || req.companyScope == 1);
+        const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
         
         let cs;
-        if (role === 'super_admin' || (role === 'admin' && isHQ)) {
+        if (roleNorm === 'super_admin' || isHQManagement) {
             cs = { clause: '', params: [] };
         } else {
             cs = companyScope(req);
@@ -171,11 +171,11 @@ exports.assignDriver = async (req, res) => {
 
 exports.remove = async (req, res) => {
     try {
-        const role = req.user.role;
-        const isHQ = (req.user.company_id == 1 || !req.user.company_id || req.companyScope == 1);
+        const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
         
         let cs;
-        if (role === 'super_admin' || (role === 'admin' && isHQ)) {
+        if (roleNorm === 'super_admin' || isHQManagement) {
             cs = { clause: '', params: [] };
         } else {
             cs = companyScope(req);

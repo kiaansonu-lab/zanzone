@@ -914,14 +914,12 @@ exports.convertToProject = async (req, res) => {
 // GET /api/orders/projects/all
 exports.getAllProjects = async (req, res) => {
     try {
-        const role = req.user.role;
-        const isHQ = (req.user.company_id == 1 || !req.user.company_id || req.companyScope == 1);
+        const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
 
         let cf;
-        if (role === 'super_admin') {
+        if (roleNorm === 'super_admin' || isHQManagement) {
             cf = { clause: '', params: [] };
-        } else if (role === 'admin' && isHQ) {
-            cf = { clause: ' AND p.manager_id = ?', params: [req.user.id] }; // or created_by if projects had it
         } else {
             cf = companyFilter(req, 'p');
         }
@@ -1050,11 +1048,11 @@ exports.createProject = async (req, res) => {
 exports.updateProject = async (req, res) => {
     try {
         const { name, description, status, location, start_date, manager_id } = req.body;
-        const role = req.user.role;
-        const isHQ = (req.user.company_id == 1 || !req.user.company_id || req.companyScope == 1);
+        const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
 
         let cs;
-        if (role === 'super_admin' || (role === 'admin' && isHQ)) {
+        if (roleNorm === 'super_admin' || isHQManagement) {
             cs = { clause: '', params: [] };
         } else {
             cs = companyScope(req);
@@ -1073,11 +1071,11 @@ exports.updateProject = async (req, res) => {
 // DELETE /api/orders/projects/:id
 exports.deleteProject = async (req, res) => {
     try {
-        const role = req.user.role;
-        const isHQ = (req.user.company_id == 1 || !req.user.company_id || req.companyScope == 1);
+        const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
 
         let cs;
-        if (role === 'super_admin' || (role === 'admin' && isHQ)) {
+        if (roleNorm === 'super_admin' || isHQManagement) {
             cs = { clause: '', params: [] };
         } else {
             cs = companyScope(req);

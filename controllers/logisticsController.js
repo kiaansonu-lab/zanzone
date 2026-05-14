@@ -115,17 +115,9 @@ exports.getDeliveries = async (req, res) => {
             return successResponse(res, rows);
         }
 
-        let companyId = await resolveValidCompanyId(req.companyScope);
-        if (!companyId) companyId = await resolveValidCompanyId(req.user?.company_id);
-        if (!companyId) companyId = await resolveValidCompanyId(process.env.DEFAULT_COMPANY_ID || 1);
-        if (!companyId) {
-            const [anyCompany] = await db.query('SELECT id FROM companies ORDER BY id ASC LIMIT 1');
-            if (anyCompany.length) companyId = anyCompany[0].id;
-        }
-        if (!companyId) return successResponse(res, []);
+        const isHQStaff = (req.user?.company_id == 1 || !req.user?.company_id);
+        const isManagementRole = ['admin', 'operations', 'concierge', 'super_admin', 'superadmin'].includes(roleNorm);
 
-        // Logic for Staff isolation
-        const isStaffOnly = ['staff', 'field_staff', 'driver'].includes(roleNorm);
         let query = `
             SELECT d.*, 
                    d.assigned_driver as driverId,
@@ -140,10 +132,20 @@ exports.getDeliveries = async (req, res) => {
             LEFT JOIN vehicles v ON d.vehicle_id = v.id
             LEFT JOIN users u ON d.assigned_driver = u.id
             LEFT JOIN orders o ON d.order_id = o.id
-            WHERE d.company_id = ?
+            WHERE 1=1
         `;
-        let params = [companyId];
+        let params = [];
 
+        if (isManagementRole && isHQStaff) {
+            // HQ Management sees everything
+        } else {
+            let companyId = await resolveValidCompanyId(req.companyScope);
+            if (!companyId) companyId = await resolveValidCompanyId(req.user?.company_id);
+            query += ` AND d.company_id = ?`;
+            params.push(companyId || 1);
+        }
+
+        const isStaffOnly = ['staff', 'field_staff', 'driver'].includes(roleNorm);
         if (isStaffOnly) {
             query += ` AND (d.assigned_driver = ? OR d.assigned_driver IS NULL)`;
             params.push(req.user.id);
