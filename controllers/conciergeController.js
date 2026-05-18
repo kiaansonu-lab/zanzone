@@ -9,7 +9,9 @@ exports.getLuxuryItems = async (req, res) => {
         const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
         
         let cf;
-        if (isSuperAdmin || (roleNorm === 'admin' && isHQ)) {
+        if (roleNorm === 'customer') {
+            cf = { clause: ' AND (client_id = ? OR created_by = ?)', params: [req.user.id, req.user.id] };
+        } else if (isSuperAdmin || (roleNorm === 'admin' && isHQ)) {
             cf = { clause: '', params: [] };
         } else {
             cf = companyFilter(req);
@@ -36,11 +38,14 @@ exports.createLuxuryItem = async (req, res) => {
         // HQ Fix
         if (companyId == 1) companyId = null;
 
+        const finalClientId = b.client_id || (req.user?.role === 'customer' ? req.user.id : null);
+        const finalCreatedBy = b.created_by || req.user?.id || null;
+
         console.log('CREATE LUXURY ITEM - resolved values:', { companyId, item_name, owner_name, vault_location, estimated_value, status });
         
         const [result] = await db.query(
-            `INSERT INTO luxury_items (company_id, item_name, owner_name, vault_location, estimated_value, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [companyId, item_name, owner_name || null, vault_location || null, estimated_value || null, status, notes]
+            `INSERT INTO luxury_items (company_id, item_name, owner_name, vault_location, estimated_value, status, notes, client_id, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [companyId, item_name, owner_name || null, vault_location || null, estimated_value || null, status, notes, finalClientId, finalCreatedBy]
         );
         return successResponse(res, { id: result.insertId, item_name }, 'Luxury item added.', 201);
     } catch (err) {

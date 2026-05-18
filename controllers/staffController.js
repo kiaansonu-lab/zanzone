@@ -11,8 +11,8 @@ exports.getAssignments = async (req, res) => {
         let extra = '';
         const extraParams = [];
 
-        // Allow 'staff' or 'field staff' to see only their assignments
-        if (role === 'staff' || role === 'field staff') {
+        // Allow non-admins to see only their own assignments
+        if (role !== 'super_admin' && role !== 'superadmin' && role !== 'admin') {
             extra = ' AND sa.assignee_id = ?';
             extraParams.push(req.user.id);
         }
@@ -132,7 +132,7 @@ exports.getLeaveRequests = async (req, res) => {
         let extra = '';
         const extraParams = [];
 
-        if (role === 'staff' || role === 'field staff') {
+        if (role !== 'super_admin' && role !== 'superadmin' && role !== 'admin') {
             extra = ' AND lr.user_id = ?';
             extraParams.push(req.user.id);
         }

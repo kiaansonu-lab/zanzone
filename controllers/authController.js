@@ -43,7 +43,8 @@ exports.login = async (req, res) => {
 
         const [users] = await db.query(
             `SELECT u.*, c.name as company_name, c.plan as company_plan,
-                    c.client_type, c.tagline, c.tenant_type, c.status as company_status
+                    c.client_type, c.tagline, c.tenant_type, c.status as company_status,
+                    u.plan as user_plan, u.is_upgraded, u.concierge_member, u.concierge_membership_since
              FROM users u
              LEFT JOIN companies c ON u.company_id = c.id
              WHERE u.email = ?`,
@@ -155,9 +156,15 @@ exports.login = async (req, res) => {
                 // Tenant info
                 tenant_id: user.company_id,
                 tenant_type: user.tenant_type || 'zanezion',
-                plan: user.company_plan || 'Free',
+                // Plan: user-level plan takes precedence (for personal accounts), then company plan, then Free
+                plan: user.user_plan || user.company_plan || 'Free',
                 client_type: user.client_type || 'SaaS',
-                is_personal: user.tagline === 'Personal' || user.company_plan === 'Free',
+                is_personal: user.tagline === 'Personal' || (!user.company_id && user.role === 'customer'),
+                // Membership fields (persisted in DB)
+                is_upgraded: !!user.is_upgraded,
+                concierge_member: !!user.concierge_member,
+                conciergeMembership: !!user.concierge_member,
+                concierge_membership_since: user.concierge_membership_since ? new Date(user.concierge_membership_since).toISOString().split('T')[0] : null,
                 phone: user.phone,
                 profile_pic_url: user.profile_pic_url,
                 is_available: user.is_available,

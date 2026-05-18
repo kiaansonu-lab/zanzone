@@ -55,10 +55,10 @@ exports.getAll = async (req, res) => {
         const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
         const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
 
-        if (roleNorm === 'admin' && isHQ) {
+        if (isHQ) {
             const [rows] = await db.query(
-                `SELECT *, location AS address FROM vendors WHERE (company_id = ? OR company_id IS NULL) AND created_by = ? ORDER BY created_at DESC`,
-                [companyId || 1, req.user.id]
+                `SELECT *, location AS address FROM vendors WHERE (company_id = ? OR company_id IS NULL) ORDER BY created_at DESC`,
+                [companyId || 1]
             );
             return successResponse(res, rows);
         }
@@ -126,9 +126,10 @@ exports.create = async (req, res) => {
 
         const ratingVal = clampPercentMetric(rating);
         const deliveryVal = clampPercentMetric(delivery);
-        // Approval flow: all new vendors start as pending (stored as inactive).
-        // Only super admin should later set them to active.
-        const safeStatus = 'inactive';
+        // Approval flow: default to 'inactive' but allow platform admins/procurement to auto-activate
+        const roleNormPost = String(req.user?.role || '').toLowerCase().trim().replace(/\s+/g, '_');
+        const canAutoActivate = ['super_admin', 'admin', 'procurement'].includes(roleNormPost);
+        const safeStatus = canAutoActivate ? 'active' : 'inactive';
 
         const [result] = await db.query(
             `INSERT INTO vendors (company_id, name, email, phone, contact_name, category, location, rating, delivery, status, created_by)

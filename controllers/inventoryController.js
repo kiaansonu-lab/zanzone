@@ -11,6 +11,10 @@ function parsePositiveIntOrNull(v) {
 
 exports.getAll = async (req, res) => {
     try {
+        const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
+        const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm);
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+
         const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
         let cf;
         if (isSuperAdmin || isHQManagement) {
@@ -42,6 +46,10 @@ exports.getAll = async (req, res) => {
 
 exports.getAlerts = async (req, res) => {
     try {
+        const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
+        const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm);
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+
         const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
         let cf;
         if (isSuperAdmin || isHQManagement) {
@@ -102,6 +110,10 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
     try {
+        const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
+        const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm);
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+
         const b = req.body;
         const { name, category, price, quantity, warehouse_id, vendor_id, client_id } = b;
         const qty = quantity !== undefined && quantity !== '' ? parseInt(quantity, 10) : undefined;
@@ -152,6 +164,10 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
     try {
+        const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
+        const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm);
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+
         const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
         let cs;
         if (isSuperAdmin || isHQManagement) {
@@ -168,6 +184,10 @@ exports.remove = async (req, res) => {
 // POST /api/inventory/:id/adjust
 exports.adjust = async (req, res) => {
     try {
+        const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
+        const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm);
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+
         const { id } = req.params;
         const { quantity, type, reason, reference_type, reference_id } = req.body;
 
@@ -282,6 +302,10 @@ exports.createWarehouse = async (req, res) => {
 
 exports.updateWarehouse = async (req, res) => {
     try {
+        const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
+        const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm);
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+
         const { name, location, capacity, manager_id, status } = req.body;
         
         let validStatus = status;
@@ -315,6 +339,10 @@ exports.updateWarehouse = async (req, res) => {
 
 exports.deleteWarehouse = async (req, res) => {
     try {
+        const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
+        const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm);
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+
         const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
         let cs;
         if (isSuperAdmin || isHQManagement) {

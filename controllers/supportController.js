@@ -13,7 +13,9 @@ exports.getTickets = async (req, res) => {
         const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
         
         let cf;
-        if (isSuperAdmin || isHQManagement) {
+        if (roleNorm === 'customer') {
+            cf = { clause: ' AND st.submitted_by = ?', params: [req.user.id] };
+        } else if (isSuperAdmin || isHQManagement) {
             cf = { clause: '', params: [] };
         } else {
             cf = companyFilter(req, 'st');
@@ -82,16 +84,22 @@ exports.getEvents = async (req, res) => {
         const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
         
         let cf;
-        if (isSuperAdmin || isHQManagement) {
+        if (roleNorm === 'customer') {
+            cf = { 
+                clause: ' AND (e.client_id = ? OR e.company_id = ? OR e.manager_id = ?)', 
+                params: [req.user.company_id || -1, req.user.company_id || -1, req.user.id] 
+            };
+        } else if (isSuperAdmin || isHQManagement) {
             cf = { clause: '', params: [] };
         } else {
             cf = companyFilter(req, 'e');
         }
         const [rows] = await db.query(
-            `SELECT e.*, COALESCE(c.name, comp.name) as client_name
+            `SELECT e.*, COALESCE(c.name, comp.name, u.name) as client_name
              FROM events e
              LEFT JOIN companies c ON e.client_id = c.id
              LEFT JOIN companies comp ON e.company_id = comp.id
+             LEFT JOIN users u ON e.manager_id = u.id
              WHERE 1=1 ${cf.clause} ORDER BY e.event_date DESC`,
             cf.params
         );
@@ -103,7 +111,8 @@ exports.getEvents = async (req, res) => {
 const EVENT_STATUS_MAP = {
     'planning': 'planned', 'pending approval': 'planned', 'pending': 'planned',
     'planned': 'planned', 'confirmed': 'confirmed', 'in_progress': 'in_progress',
-    'in progress': 'in_progress', 'completed': 'completed', 'cancelled': 'cancelled'
+    'in progress': 'in_progress', 'completed': 'completed', 'cancelled': 'cancelled',
+    'active': 'confirmed', 'setup': 'in_progress', 'on_hold': 'on_hold', 'on hold': 'on_hold'
 };
 const normalizeEventStatus = (status) => EVENT_STATUS_MAP[(status || '').toLowerCase()] || 'planned';
 
@@ -115,8 +124,10 @@ exports.createEvent = async (req, res) => {
         // HQ Fix
         if (companyId == 1) companyId = null;
 
+        const cleanClientId = client_id ? parseInt(String(client_id).replace('CLT-', '')) : null;
+
         // For super_admin / admin: resolve company_id from client_id if provided
-        if (!companyId && client_id) companyId = client_id;
+        if (!companyId && cleanClientId) companyId = cleanClientId;
 
         const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
         // Customer requests always go as 'planned' (pending approval)
@@ -124,9 +135,9 @@ exports.createEvent = async (req, res) => {
 
         const [result] = await db.query(
             `INSERT INTO events (company_id, name, event_date, location, client_id, manager_id, status, image_url, special_requests, planner_name, guest_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [companyId, name, event_date || null, location || null, client_id || null, manager_id || req.user.id, finalStatus, imageUrl, special_requests || null, planner_name || null, guest_count || 0]
+            [companyId, name, event_date || null, location || null, cleanClientId, manager_id || req.user.id, finalStatus, imageUrl, special_requests || null, planner_name || null, guest_count || 0]
         );
-        const [events] = await db.query(`SELECT e.*, COALESCE(c.name, comp.name) as client_name FROM events e LEFT JOIN companies c ON e.client_id = c.id LEFT JOIN companies comp ON e.company_id = comp.id WHERE e.id = ?`, [result.insertId]);
+        const [events] = await db.query(`SELECT e.*, COALESCE(c.name, comp.name, u.name) as client_name FROM events e LEFT JOIN companies c ON e.client_id = c.id LEFT JOIN companies comp ON e.company_id = comp.id LEFT JOIN users u ON e.manager_id = u.id WHERE e.id = ?`, [result.insertId]);
         // Notify concierge about new event
         await createNotification({
             companyId,
@@ -159,12 +170,13 @@ exports.updateEvent = async (req, res) => {
             cs = companyScope(req);
         }
 
+        const cleanClientId = client_id ? parseInt(String(client_id).replace('CLT-', '')) : null;
         const dbStatus = status ? normalizeEventStatus(status) : undefined;
         const imageUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
 
         await db.query(
             `UPDATE events SET name = COALESCE(?, name), event_date = COALESCE(?, event_date), location = COALESCE(?, location), client_id = COALESCE(?, client_id), status = COALESCE(?, status), image_url = COALESCE(?, image_url), special_requests = COALESCE(?, special_requests), planner_name = COALESCE(?, planner_name), guest_count = COALESCE(?, guest_count) WHERE id = ?${cs.clause}`,
-            [name, event_date, location, client_id, dbStatus, imageUrl, special_requests, planner_name, guest_count, req.params.id, ...cs.params]
+            [name, event_date, location, cleanClientId, dbStatus, imageUrl, special_requests, planner_name, guest_count, req.params.id, ...cs.params]
         );
         const [evtRow] = await db.query('SELECT company_id FROM events WHERE id = ?', [req.params.id]);
         const evtCompanyId = evtRow[0]?.company_id;
@@ -204,7 +216,9 @@ exports.getGuestRequests = async (req, res) => {
         const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
         
         let cf;
-        if (isSuperAdmin || isHQManagement) {
+        if (roleNorm === 'customer') {
+            cf = { clause: ' AND gr.client_id = ?', params: [req.user.id] };
+        } else if (isSuperAdmin || isHQManagement) {
             cf = { clause: '', params: [] };
         } else {
             cf = companyFilter(req, 'gr');
@@ -236,11 +250,13 @@ exports.createGuestRequest = async (req, res) => {
         // HQ Fix
         if (companyId == 1) companyId = null;
 
+        const finalClientId = req.user?.role === 'customer' ? req.user.id : (client_id || null);
+
         const dbPriority = normalizePriority(priority);
         const dbStatus = normalizeGuestStatus(status);
         const [result] = await db.query(
             `INSERT INTO guest_requests (company_id, client_id, guest, requested_by, request_details, delivery_time, priority, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [companyId, client_id || null, guest || null, requested_by || null, request_details || null, delivery_time || null, dbPriority, dbStatus]
+            [companyId, finalClientId, guest || null, requested_by || null, request_details || null, delivery_time || null, dbPriority, dbStatus]
         );
         await createNotification({ companyId, roleTarget: 'concierge', type: 'order', title: 'New Concierge Request', message: `"${request_details || 'Service request'}" from ${guest || 'Guest'} — ${dbPriority} priority`, link: '/dashboard/guest-requests' });
         await createNotification({ companyId, roleTarget: 'admin', type: 'order', title: 'New Concierge Request', message: `Guest request from ${guest || 'Guest'}`, link: '/dashboard/guest-requests' });
@@ -306,7 +322,9 @@ exports.getChauffeurRequests = async (req, res) => {
         const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
         
         let cf;
-        if (isSuperAdmin || isHQManagement) {
+        if (roleNorm === 'customer') {
+            cf = { clause: ' AND (d.client_id = ? OR d.created_by = ?)', params: [req.user.id, req.user.id] };
+        } else if (isSuperAdmin || isHQManagement) {
             cf = { clause: '', params: [] };
         } else {
             cf = companyFilter(req, 'd');
@@ -329,7 +347,9 @@ exports.getAudits = async (req, res) => {
         const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
         
         let cf;
-        if (isSuperAdmin || isHQManagement) {
+        if (roleNorm === 'customer') {
+            cf = { clause: ' AND al.performed_by = ?', params: [req.user.id] };
+        } else if (isSuperAdmin || isHQManagement) {
             cf = { clause: '', params: [] };
         } else {
             cf = companyFilter(req, 'al');

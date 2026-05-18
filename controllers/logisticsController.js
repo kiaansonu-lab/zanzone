@@ -136,7 +136,10 @@ exports.getDeliveries = async (req, res) => {
         `;
         let params = [];
 
-        if (isManagementRole && isHQStaff) {
+        if (roleNorm === 'customer') {
+            query += ` AND (d.client_id = ? OR d.created_by = ?)`;
+            params.push(req.user.id, req.user.id);
+        } else if (isManagementRole && isHQStaff) {
             // HQ Management sees everything
         } else {
             let companyId = await resolveValidCompanyId(req.companyScope);
@@ -228,10 +231,13 @@ exports.createDelivery = async (req, res) => {
                 ? String(delivery_instructions).trim()
                 : null;
 
+        const finalClientId = req.body.client_id || req.body.customer_id || (req.user?.role === 'customer' ? req.user.id : null);
+        const finalCreatedBy = req.body.created_by || req.user?.id || null;
+
         let result;
         try {
             [result] = await db.query(
-                `INSERT INTO deliveries (company_id, order_id, mission_type, route, driver_name, plate_number, package_details, pickup_location, drop_location, passenger_info, delivery_date, pickup_time, status, assigned_driver, delivery_instructions, delivery_fee) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO deliveries (company_id, order_id, mission_type, route, driver_name, plate_number, package_details, pickup_location, drop_location, passenger_info, delivery_date, pickup_time, status, assigned_driver, delivery_instructions, delivery_fee, client_id, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     companyId,
                     safeOrderId,
@@ -248,13 +254,15 @@ exports.createDelivery = async (req, res) => {
                     status || 'pending',
                     assigned_driver || null,
                     instructVal,
-                    Number.isFinite(feeVal) ? feeVal : null
+                    Number.isFinite(feeVal) ? feeVal : null,
+                    finalClientId,
+                    finalCreatedBy
                 ]
             );
         } catch (insErr) {
             if (insErr.code === 'ER_BAD_FIELD_ERROR') {
                 [result] = await db.query(
-                    `INSERT INTO deliveries (company_id, order_id, mission_type, route, driver_name, plate_number, package_details, pickup_location, drop_location, passenger_info, delivery_date, pickup_time, status, assigned_driver) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    `INSERT INTO deliveries (company_id, order_id, mission_type, route, driver_name, plate_number, package_details, pickup_location, drop_location, passenger_info, delivery_date, pickup_time, status, assigned_driver, client_id, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                     [
                         companyId,
                         safeOrderId,
@@ -269,7 +277,9 @@ exports.createDelivery = async (req, res) => {
                         safeDeliveryDate,
                         safePickupTime,
                         status || 'pending',
-                        assigned_driver || null
+                        assigned_driver || null,
+                        finalClientId,
+                        finalCreatedBy
                     ]
                 );
             } else {

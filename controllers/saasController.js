@@ -181,6 +181,16 @@ exports.updateRequest = async (req, res) => {
             if (companySets.length > 0) {
                 companyVals.push(compId);
                 await db.query(`UPDATE companies SET ${companySets.join(', ')} WHERE id = ?`, companyVals);
+                // Persist plan change to users in that company (non-Free -> is_upgraded)
+                try {
+                    if (plan !== undefined) {
+                        const planVal = String(plan || '').trim().toLowerCase();
+                        const upgradeFlag = planVal && planVal !== 'free' ? 1 : 0;
+                        await db.query('UPDATE users SET is_upgraded = ? WHERE company_id = ?', [upgradeFlag, compId]);
+                    }
+                } catch (e) {
+                    console.log('Sync user is_upgraded skipped:', e.message);
+                }
             }
         }
 

@@ -461,7 +461,31 @@ exports.create = async (req, res) => {
                      ORDER BY (company_id <=> ?) DESC, id DESC LIMIT 1`,
                     [em, companyId, companyId]
                 );
-                if (custMatch.length) resolvedCustomerId = custMatch[0].id;
+                if (custMatch.length) {
+                    resolvedCustomerId = custMatch[0].id;
+                }
+            }
+
+            // If the frontend sent a customer_id that is actually a user id, try to resolve it.
+            if (!resolvedCustomerId && customer_id) {
+                const maybeUserId = parseInt(customer_id, 10);
+                if (!Number.isNaN(maybeUserId)) {
+                    const [userCustomerMatch] = await db.query(
+                        `SELECT id FROM customers WHERE created_by = ? OR LOWER(TRIM(email)) = ? ORDER BY created_at DESC LIMIT 1`,
+                        [maybeUserId, String(req.user.email || '').trim().toLowerCase()]
+                    );
+                    if (userCustomerMatch.length) resolvedCustomerId = userCustomerMatch[0].id;
+                }
+            }
+
+            // If there is still no matching customer record, create one for the logged-in customer.
+            if (!resolvedCustomerId) {
+                const [newCust] = await db.query(
+                    `INSERT INTO customers (company_id, name, email, phone, contact, address, client_type, status, created_by)
+                     VALUES (?, ?, ?, ?, ?, ?, 'Direct', 'active', ?)`,
+                    [companyId, req.user.name || null, req.user.email || null, req.user.phone || null, req.user.name || null, null, req.user.id]
+                );
+                resolvedCustomerId = newCust.insertId;
             }
         } else if (resolvedCustomerId != null) {
             const [custOk] = await db.query('SELECT id FROM customers WHERE id = ?', [resolvedCustomerId]);

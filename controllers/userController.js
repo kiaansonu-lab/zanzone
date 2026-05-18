@@ -13,7 +13,7 @@ exports.getCustomers = async (req, res) => {
         const includeAll = String(req.query?.include_all || '').toLowerCase() === '1' || String(req.query?.include_all || '').toLowerCase() === 'true';
         const includeClientRole = String(req.query?.include_client_role || '').toLowerCase() === '1' || String(req.query?.include_client_role || '').toLowerCase() === 'true';
 
-        let query = `SELECT id, name, email, phone, role, status, company_id
+        let query = `SELECT id, name, email, phone, role, status, company_id, plan, concierge_member, concierge_membership_since, is_upgraded
                      FROM users WHERE role IN (${includeClientRole ? "'customer','client','business_client'" : "'customer'"})`;
         const params = [];
 
@@ -49,14 +49,16 @@ exports.getAll = async (req, res) => {
         const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm.replace(/\s+/g, '')) || ['super_admin', 'superadmin'].includes(roleNorm);
         const isHQ = (req.user.company_id == 1 || !req.user.company_id || req.companyScope == 1);
 
-        // HQ admins see only their own created users, Super Admins see ALL
+        // HQ admins see only their own created users, Super Admins see ALL, non-admins see ONLY themselves
         let cf;
         if (isSuperAdmin) {
             cf = { clause: '', params: [] };
         } else if ((roleNorm === 'admin' || roleNorm === 'manager') && isHQ) {
             cf = { clause: ' AND (u.created_by = ? OR u.id = ?)', params: [req.user.id, req.user.id] };
-        } else {
+        } else if (roleNorm === 'admin' || roleNorm === 'manager') {
             cf = companyFilter(req);
+        } else {
+            cf = { clause: ' AND u.id = ?', params: [req.user.id] };
         }
 
         const qStatus = String(req.query?.status || '').toLowerCase().trim();
@@ -76,6 +78,7 @@ exports.getAll = async (req, res) => {
                     u.is_available, u.employment_status, u.status, u.joined_date,
                     u.profile_pic_url, u.birthday, u.bank_name, u.account_number,
                     u.routing_number, u.nib_number, u.vacation_balance,
+                    u.plan, u.is_upgraded, u.concierge_member, u.concierge_membership_since,
                     u.passport_url, u.license_url, u.nib_doc_url, u.police_record_url,
                     u.business_license_url, c.name as company_name, c.client_type, c.tenant_type
              FROM users u LEFT JOIN companies c ON u.company_id = c.id
@@ -98,10 +101,12 @@ exports.getById = async (req, res) => {
         let cs;
         if (isSuperAdmin) {
             cs = { clause: '', params: [] };
-        } else if (isHQ) {
+        } else if ((roleNorm === 'admin' || roleNorm === 'manager') && isHQ) {
             cs = { clause: ' AND (u.created_by = ? OR u.id = ?)', params: [req.user.id, req.user.id] };
-        } else {
+        } else if (roleNorm === 'admin' || roleNorm === 'manager') {
             cs = companyScope(req, 'u');
+        } else {
+            cs = { clause: ' AND u.id = ?', params: [req.user.id] };
         }
 
         const [rows] = await db.query(
@@ -210,6 +215,41 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
     try {
         const body = { ...req.body };
+        const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
+        const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm);
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+        const isSelf = String(req.user.id) === String(req.params.id);
+
+        // Authorization check: must be super_admin, admin/manager, or updating own profile
+        if (!isSelf && !isSuperAdmin && !(roleNorm === 'admin' || roleNorm === 'manager')) {
+            return errorResponse(res, 'Access denied.', 403);
+        }
+
+        // Automatic plan/membership upgrade persistence
+        // Save to BOTH company (if exists) AND user row (for personal accounts with no company)
+        if (body.plan || body.concierge_member !== undefined || body.is_upgraded !== undefined) {
+            const [userRows] = await db.query('SELECT company_id FROM users WHERE id = ?', [req.params.id]);
+            const newPlan = body.plan || 'Premium';
+            // Update company plan if user has a company
+            if (userRows.length > 0 && userRows[0].company_id) {
+                const companyId = userRows[0].company_id;
+                await db.query('UPDATE companies SET plan = ? WHERE id = ?', [newPlan, companyId]);
+                console.log(`  ✅ Updated company ID ${companyId} plan to ${newPlan}`);
+            }
+            // Always update user row directly (critical for personal accounts with no company)
+            const memberSets = [];
+            const memberVals = [];
+            if (body.plan) { memberSets.push('plan = ?'); memberVals.push(body.plan); }
+            if (body.is_upgraded !== undefined) { memberSets.push('is_upgraded = ?'); memberVals.push(body.is_upgraded ? 1 : 0); }
+            if (body.concierge_member !== undefined) { memberSets.push('concierge_member = ?'); memberVals.push(body.concierge_member ? 1 : 0); }
+            if (body.concierge_member) { memberSets.push('concierge_membership_since = COALESCE(concierge_membership_since, CURDATE())'); }
+            if (body.concierge_member === false) { memberSets.push('concierge_membership_since = NULL'); }
+            if (memberSets.length > 0) {
+                memberVals.push(req.params.id);
+                await db.query(`UPDATE users SET ${memberSets.join(', ')} WHERE id = ?`, memberVals);
+                console.log(`  ✅ Updated user ID ${req.params.id} membership fields directly`);
+            }
+        }
 
         // Flatten bankingInfo nested object → individual DB columns
         if (body.bankingInfo && typeof body.bankingInfo === 'object') {
@@ -231,7 +271,7 @@ exports.update = async (req, res) => {
                 'field_staff': 'staff', 'field staff': 'staff',
                 'staff_management': 'admin', 'client_admin': 'admin'
             };
-            let r = body.role.toLowerCase().trim().replace(/\s+/g, '_');
+            const r = body.role.toLowerCase().trim().replace(/\s+/g, '_');
             body.role = roleMap[r] || (r.includes('staff') ? 'staff' : r);
         }
 
@@ -239,7 +279,8 @@ exports.update = async (req, res) => {
             'name', 'email', 'phone', 'role', 'company_id', 'employment_status',
             'is_available', 'status', 'joined_date', 'profile_pic_url', 'password',
             'birthday', 'bank_name', 'account_number', 'routing_number',
-            'nib_number', 'vacation_balance'
+            'nib_number', 'vacation_balance',
+            'plan', 'is_upgraded', 'concierge_member', 'concierge_membership_since'
         ];
 
         const sets = [];
@@ -260,14 +301,14 @@ exports.update = async (req, res) => {
             }
         }
 
-        if (sets.length === 0) return errorResponse(res, 'No fields to update.', 400);
+        if (sets.length === 0 && !body.plan && !body.concierge_member && !body.is_upgraded) {
+            return errorResponse(res, 'No fields to update.', 400);
+        }
 
-        const roleNorm = String(req.user?.role || '').toLowerCase().replace(/\s+/g, '_');
-        const isSuperAdmin = ['super_admin', 'superadmin'].includes(roleNorm);
-        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
-        
         let cs;
         if (isSuperAdmin) {
+            cs = { clause: '', params: [] };
+        } else if (isSelf) {
             cs = { clause: '', params: [] };
         } else if (isHQ) {
             cs = { clause: ' AND (u.created_by = ? OR u.id = ?)', params: [req.user.id, req.user.id] };
@@ -275,13 +316,16 @@ exports.update = async (req, res) => {
             cs = companyScope(req, 'u');
         }
 
-        values.push(req.params.id, ...cs.params);
-        await db.query(`UPDATE users SET ${sets.join(', ')} WHERE id = ?${cs.clause}`, values);
+        if (sets.length > 0) {
+            values.push(req.params.id, ...cs.params);
+            await db.query(`UPDATE users SET ${sets.join(', ')} WHERE id = ?${cs.clause}`, values);
+        }
         const [updatedRows] = await db.query(
             `SELECT u.id, u.company_id, u.name, u.email, u.phone, u.role,
                     u.is_available, u.employment_status, u.status, u.joined_date,
                     u.profile_pic_url, u.birthday, u.bank_name, u.account_number,
                     u.routing_number, u.nib_number, u.vacation_balance,
+                    u.plan, u.is_upgraded, u.concierge_member, u.concierge_membership_since,
                     u.passport_url, u.license_url, u.nib_doc_url, u.police_record_url,
                     u.business_license_url, c.name as company_name, c.client_type, c.tenant_type
              FROM users u LEFT JOIN companies c ON u.company_id = c.id

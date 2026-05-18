@@ -6,7 +6,10 @@ const { createNotification } = require('./notificationController');
 // --- PURCHASE REQUESTS ---
 exports.getRequests = async (req, res) => {
     try {
-        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
+        const roleNorm = String(req.user?.role || '').toLowerCase().trim().replace(/\s+/g, '_');
+        const isSuperAdmin = roleNorm === 'super_admin' || roleNorm === 'superadmin';
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'operation', 'procurement', 'super_admin', 'superadmin'].includes(roleNorm));
         let cf;
         if (isSuperAdmin || isHQManagement) {
             cf = { clause: '', params: [] };
@@ -76,7 +79,10 @@ exports.updateRequest = async (req, res) => {
 
         if (sets.length === 0) return successResponse(res, null, 'No valid fields to update.');
 
-        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
+        const roleNorm = String(req.user?.role || '').toLowerCase().trim().replace(/\s+/g, '_');
+        const isSuperAdmin = roleNorm === 'super_admin' || roleNorm === 'superadmin';
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'operation', 'procurement', 'super_admin', 'superadmin'].includes(roleNorm));
         let cs;
         if (isSuperAdmin || isHQManagement) {
             cs = { clause: '', params: [] };
@@ -101,7 +107,10 @@ exports.updateRequest = async (req, res) => {
 
 exports.deleteRequest = async (req, res) => {
     try {
-        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
+        const roleNorm = String(req.user?.role || '').toLowerCase().trim().replace(/\s+/g, '_');
+        const isSuperAdmin = roleNorm === 'super_admin' || roleNorm === 'superadmin';
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'operation', 'procurement', 'super_admin', 'superadmin'].includes(roleNorm));
         let cs;
         if (isSuperAdmin || isHQManagement) {
             cs = { clause: '', params: [] };
@@ -116,7 +125,10 @@ exports.deleteRequest = async (req, res) => {
 // --- QUOTES ---
 exports.getQuotes = async (req, res) => {
     try {
-        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
+        const roleNorm = String(req.user?.role || '').toLowerCase().trim().replace(/\s+/g, '_');
+        const isSuperAdmin = roleNorm === 'super_admin' || roleNorm === 'superadmin';
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'operation', 'procurement', 'super_admin', 'superadmin'].includes(roleNorm));
         let cf;
         if (isSuperAdmin || isHQManagement) {
             cf = { clause: '', params: [] };
@@ -181,7 +193,10 @@ exports.updateQuote = async (req, res) => {
             values.push(k === 'items' ? JSON.stringify(v) : v);
         }
 
-        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
+        const roleNorm = String(req.user?.role || '').toLowerCase().trim().replace(/\s+/g, '_');
+        const isSuperAdmin = roleNorm === 'super_admin' || roleNorm === 'superadmin';
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'operation', 'procurement', 'super_admin', 'superadmin'].includes(roleNorm));
         let cs;
         if (isSuperAdmin || isHQManagement) {
             cs = { clause: '', params: [] };
@@ -200,7 +215,10 @@ exports.updateQuote = async (req, res) => {
 
 exports.deleteQuote = async (req, res) => {
     try {
-        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
+        const roleNorm = String(req.user?.role || '').toLowerCase().trim().replace(/\s+/g, '_');
+        const isSuperAdmin = roleNorm === 'super_admin' || roleNorm === 'superadmin';
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'operation', 'procurement', 'super_admin', 'superadmin'].includes(roleNorm));
         let cs;
         if (isSuperAdmin || isHQManagement) {
             cs = { clause: '', params: [] };
@@ -215,7 +233,10 @@ exports.deleteQuote = async (req, res) => {
 // --- PURCHASE ORDERS ---
 exports.getPOs = async (req, res) => {
     try {
-        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
+        const roleNorm = String(req.user?.role || '').toLowerCase().trim().replace(/\s+/g, '_');
+        const isSuperAdmin = roleNorm === 'super_admin' || roleNorm === 'superadmin';
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'operation', 'procurement', 'super_admin', 'superadmin'].includes(roleNorm));
         let cf;
         if (isSuperAdmin || isHQManagement) {
             cf = { clause: '', params: [] };
@@ -276,7 +297,10 @@ exports.updatePO = async (req, res) => {
 
         if (sets.length === 0) return successResponse(res, { id: req.params.id }, 'Nothing to update.');
 
-        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
+        const roleNorm = String(req.user?.role || '').toLowerCase().trim().replace(/\s+/g, '_');
+        const isSuperAdmin = roleNorm === 'super_admin' || roleNorm === 'superadmin';
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'operation', 'procurement', 'super_admin', 'superadmin'].includes(roleNorm));
         let cs;
         if (isSuperAdmin || isHQManagement) {
             cs = { clause: '', params: [] };
@@ -299,7 +323,10 @@ exports.receiveGoods = async (req, res) => {
         const { id } = req.params;
         const receivedItems = req.body;
         
-        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'super_admin', 'superadmin'].includes(roleNorm));
+        const roleNorm = String(req.user?.role || '').toLowerCase().trim().replace(/\s+/g, '_');
+        const isSuperAdmin = roleNorm === 'super_admin' || roleNorm === 'superadmin';
+        const isHQ = (req.user?.company_id == 1 || !req.user?.company_id || req.companyScope == 1);
+        const isHQManagement = (isHQ && ['admin', 'concierge', 'operations', 'operation', 'procurement', 'super_admin', 'superadmin'].includes(roleNorm));
         let cs;
         if (isSuperAdmin || isHQManagement) {
             cs = { clause: '', params: [] };

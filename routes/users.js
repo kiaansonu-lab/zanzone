@@ -14,9 +14,9 @@ router.get('/customers', requireRole('super_admin', 'admin', 'operation', 'saas_
 router.get('/', requireRole('super_admin', 'admin', 'operation', 'logistics', 'saas_client', 'client', 'procurement', 'inventory'), ctrl.getAll);
 router.get('/:id', ctrl.getById);
 
-// Only super_admin and tenant admins (admin role) can create/update/delete users
+// Only super_admin and tenant admins (admin role) can create/delete users, while users can update their own profile
 router.post('/', requireRole('super_admin', 'admin'), ctrl.create);
-router.put('/:id', requireRole('super_admin', 'admin'), ctrl.update);
+router.put('/:id', ctrl.update);
 router.delete('/:id', requireRole('super_admin', 'admin'), ctrl.remove);
 
 // Staff review (approve/reject pending staff)

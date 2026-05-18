@@ -490,6 +490,17 @@ exports.update = async (req, res) => {
             }
         }
 
+        // If this was a company record update and plan changed, persist upgrade flag to company users
+        try {
+            if (isSuperAdmin && table === 'companies' && rawFields.plan !== undefined) {
+                const planVal = String(rawFields.plan || '').trim().toLowerCase();
+                const upgradeFlag = planVal && planVal !== 'free' ? 1 : 0;
+                await db.query('UPDATE users SET is_upgraded = ? WHERE company_id = ?', [upgradeFlag, req.params.id]);
+            }
+        } catch (syncErr) {
+            console.log('Sync user is_upgraded skipped:', syncErr.message);
+        }
+
         // Sync back to saas_requests if linked (saas_requests may not have company_id — skip safely)
         if (isSuperAdmin) {
             try {

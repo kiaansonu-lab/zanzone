@@ -17,7 +17,10 @@ app.use(cors({
         "https://new-zanezion.netlify.app",
         "http://localhost:5173",
         "http://localhost:5174",
-       "https://zanezion.kiaansoftware.com"
+        "http://10.171.118.119:5173",
+        "http://10.171.118.119:5174",
+        "http://10.171.118.119:8081",
+        "https://zanezion.kiaansoftware.com"
     ],
     credentials: true
 }));
